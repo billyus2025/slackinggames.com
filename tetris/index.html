@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Neon Tetris</title><style>body{background:#000;color:#fff;font-family:monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;touch-action:none}canvas{border:1px solid #333;box-shadow:0 0 20px #0cf}#ui{width:240px;display:flex;justify-content:space-between;margin-bottom:10px;color:#0cf;font-size:20px;font-weight:bold}#ctrl{display:none;margin-top:20px;gap:20px}@media(max-width:600px){#ctrl{display:flex}canvas{width:70vw}}button{background:#111;border:1px solid #0cf;color:#0cf;width:60px;height:60px;font-size:24px;border-radius:50%}</style></head><body><div id="ui"><span>SCORE: <span id="s">0</span></span></div><canvas id="t" width="240" height="400"></canvas><div id="ctrl"><button id="bl">←</button><button id="br">rotate</button><button id="bd">↓</button><button id="bRi">→</button></div><script>
+const cv=document.getElementById('t'),ctx=cv.getContext('2d');ctx.scale(20,20);
+const P='ILJOTSZ',C=[null,'#FF0D72','#0DC2FF','#0DFF72','#F538FF','#FF8E0D','#FFE138','#3877FF'];
+function cM(w,h){const m=[];while(h--)m.push(new Array(w).fill(0));return m}
+function cP(t){if(t=='I')return[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]];if(t=='L')return[[0,2,0],[0,2,0],[0,2,2]];if(t=='J')return[[0,3,0],[0,3,0],[3,3,0]];if(t=='O')return[[4,4],[4,4]];if(t=='Z')return[[5,5,0],[0,5,5],[0,0,0]];if(t=='S')return[[0,6,6],[6,6,0],[0,0,0]];if(t=='T')return[[0,7,0],[7,7,7],[0,0,0]];}
+let ar=cM(12,20),pl={p:{x:0,y:0},m:null,s:0},dr=0,last=0;
+function col(a,p){const[m,o]=[p.m,p.p];for(let y=0;y<m.length;++y)for(let x=0;x<m[y].length;++x)if(m[y][x]!==0&&(a[y+o.y]&&a[y+o.y][x+o.x])!==0)return 1;return 0;}
+function drw(){ctx.fillStyle='#000';ctx.fillRect(0,0,cv.width,cv.height);dM(ar,{x:0,y:0});dM(pl.m,pl.p);}
+function dM(m,o){m.forEach((r,y)=>{r.forEach((v,x)=>{if(v!==0){ctx.fillStyle=C[v];ctx.shadowBlur=10;ctx.shadowColor=C[v];ctx.fillRect(x+o.x,y+o.y,1,1);ctx.shadowBlur=0;}})});}
+function mer(a,p){p.m.forEach((r,y)=>{r.forEach((v,x)=>{if(v!==0)a[y+p.p.y][x+p.p.x]=v;});});}
+function rot(m,d){for(let y=0;y<m.length;++y)for(let x=0;x<y;++x)[m[x][y],m[y][x]]=[m[y][x],m[x][y]];if(d>0)m.forEach(r=>r.reverse());else m.reverse();}
+function pR(){pl.m=cP(P[P.length*Math.random()|0]);pl.p.y=0;pl.p.x=(ar[0].length/2|0)-(pl.m[0].length/2|0);if(col(ar,pl)){ar.forEach(r=>r.fill(0));pl.s=0;upS();}}
+function pD(){pl.p.y++;if(col(ar,pl)){pl.p.y--;mer(ar,pl);pR();sw();upS();}dr=0;}
+function pM(d){pl.p.x+=d;if(col(ar,pl))pl.p.x-=d;}
+function pRt(d){const p=pl.p.x;let o=1;rot(pl.m,d);while(col(ar,pl)){pl.p.x+=o;o=-(o+(o>0?1:-1));if(o>pl.m[0].length){rot(pl.m,-d);pl.p.x=p;return;}}}
+function sw(){let c=1;outer:for(let y=ar.length-1;y>0;--y){for(let x=0;x<ar[y].length;++x)if(ar[y][x]===0)continue outer;const r=ar.splice(y,1)[0].fill(0);ar.unshift(r);++y;pl.s+=c*10;c*=2;}}
+function upS(){document.getElementById('s').innerText=pl.s;}
+function up(t=0){const dt=t-last;last=t;dr+=dt;if(dr>1000)pD();drw();requestAnimationFrame(up);}
+document.addEventListener('keydown',e=>{if(e.keyCode===37)pM(-1);else if(e.keyCode===39)pM(1);else if(e.keyCode===40)pD();else if(e.keyCode===38)pRt(1);});
+['bl','br','bd','bRi'].forEach((k,i)=>{document.getElementById(k).onclick=(e)=>{e.preventDefault();if(i==0)pM(-1);if(i==1)pRt(1);if(i==2)pD();if(i==3)pM(1);}});
+pR();up();
+</script></body></html>
