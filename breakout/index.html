@@ -1,21 +1,355 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Neon Breaker</title><style>body{margin:0;background:#050505;color:#fff;font-family:monospace;overflow:hidden;display:flex;align-items:center;justify-content:center;height:100vh}canvas{border:1px solid #222;box-shadow:0 0 30px rgba(255,0,85,0.2);background:#000;cursor:none}#ui{position:absolute;top:20px;text-align:center;pointer-events:none;width:100%}#s{color:#0f8;font-size:24px}</style></head><body><div id="ui"><div id="s">SCORE: 0</div></div><canvas id="c"></canvas><script>
-const c=document.getElementById('c'),x=c.getContext('2d'),S=document.getElementById('s');
-let w,h,p={x:0,y:0,w:100,h:15},b={x:0,y:0,r:6,dx:4,dy:-4},br=[],sc=0;
-function rsz(){w=c.width=Math.min(window.innerWidth,500);h=c.height=Math.min(window.innerHeight,800);p.y=h-40;p.x=w/2-50;initB();}
-function initB(){br=[];for(let r=0;r<6;r++)for(let c=0;c<7;c++)br.push({x:c*(w/7)+5,y:r*25+50,w:w/7-10,h:15,s:1});}
-function dr(){
-x.fillStyle='rgba(0,0,0,0.3)';x.fillRect(0,0,w,h);
-x.fillStyle='#0f8';x.shadowBlur=15;x.shadowColor='#0f8';x.fillRect(p.x,p.y,p.w,p.h);
-x.fillStyle='#fff';x.beginPath();x.arc(b.x,b.y,b.r,0,6.28);x.fill();
-br.forEach(k=>{if(k.s){x.fillStyle='#f05';x.shadowColor='#f05';x.fillRect(k.x,k.y,k.w,k.h);}});}
-function up(){
-b.x+=b.dx;b.y+=b.dy;
-if(b.x<0||b.x>w)b.dx=-b.dx;if(b.y<0)b.dy=-b.dy;
-if(b.y>h){sc=0;S.innerText='SCORE: '+sc;b.x=w/2;b.y=h/2;initB();}
-if(b.x>p.x&&b.x<p.x+p.w&&b.y>p.y&&b.y<p.y+p.h)b.dy=-Math.abs(b.dy);
-br.forEach(k=>{if(k.s&&b.x>k.x&&b.x<k.x+k.w&&b.y>k.y&&b.y<k.y+k.h){b.dy=-b.dy;k.s=0;sc+=10;S.innerText='SCORE: '+sc;}});
-dr();requestAnimationFrame(up);}
-window.onresize=rsz;window.onmousemove=e=>{let r=c.getBoundingClientRect();p.x=e.clientX-r.left-p.w/2;};
-window.ontouchmove=e=>{let r=c.getBoundingClientRect();p.x=e.touches[0].clientX-r.left-p.w/2;};
-rsz();b.x=w/2;b.y=h/2;initB();up();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>Neon Breaker</title>
+    <style>
+        /* 1. 基础设置与防误触 */
+        body {
+            margin: 0;
+            background: #050505;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden; /* 禁止页面滚动 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            touch-action: none; /* 关键：禁止触摸时的默认动作 */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* 2. 游戏容器 */
+        #game-box {
+            position: relative;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.15);
+            border: 2px solid #222;
+            background: #000;
+        }
+
+        /* 震动特效 */
+        .shake { animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        canvas { display: block; cursor: none; /* 隐藏鼠标指针，更沉浸 */ }
+
+        /* 3. UI 文字 */
+        #ui {
+            position: absolute;
+            top: 30px;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .score { font-size: 40px; font-weight: bold; color: #333; opacity: 0.5; }
+        .tip { font-size: 14px; color: #0f8; margin-top: 5px; text-shadow: 0 0 5px #0f8; }
+
+        /* 4. 游戏结束遮罩 */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            transition: opacity 0.3s;
+        }
+        h1 { margin: 0; font-size: 3rem; color: #fff; text-shadow: 0 0 20px #f05; letter-spacing: 5px; }
+        button {
+            margin-top: 30px; padding: 12px 40px; font-size: 1.2rem;
+            background: transparent; color: #0f8; border: 2px solid #0f8;
+            border-radius: 30px; cursor: pointer; font-family: inherit;
+            text-transform: uppercase; font-weight: bold;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+        button:active { background: #0f8; color: #000; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-box">
+        <canvas id="c"></canvas>
+        <div id="ui">
+            <div class="score" id="s">0</div>
+            <div class="tip" id="tip">DRAG TO MOVE</div>
+        </div>
+        <div id="overlay">
+            <h1 id="title">NEON<br>BREAKER</h1>
+            <button id="btn">START</button>
+        </div>
+    </div>
+
+    <script>
+        const c = document.getElementById('c');
+        const ctx = c.getContext('2d');
+        const box = document.getElementById('game-box');
+        const uiScore = document.getElementById('s');
+        const overlay = document.getElementById('overlay');
+        const btn = document.getElementById('btn');
+        const title = document.getElementById('title');
+
+        // 响应式画布
+        let w, h;
+        function resize() {
+            // 电脑上限制最大宽度，手机全屏
+            w = c.width = Math.min(window.innerWidth, 500);
+            h = c.height = Math.min(window.innerHeight, 800);
+            // 如果是正在玩，调整挡板位置
+            if(paddle) paddle.y = h - 50;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 游戏参数
+        let isPlaying = false;
+        let animationId;
+        let score = 0;
+        const colors = ['#ff0055', '#ffcc00', '#00ff88', '#00ccff', '#aa00ff'];
+
+        // 实体对象
+        let paddle = { x: w/2-50, y: h-50, w: 100, h: 15, color: '#0f8' };
+        let ball = { x: w/2, y: h/2, r: 6, dx: 0, dy: 0, speed: 5, tail: [] };
+        let bricks = [];
+        let particles = [];
+
+        // --- 特效系统 ---
+        
+        function shake() {
+            box.classList.remove('shake');
+            void box.offsetWidth;
+            box.classList.add('shake');
+        }
+
+        function explode(x, y, color) {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        // --- 游戏逻辑 ---
+
+        function initLevel() {
+            bricks = [];
+            const cols = 6;
+            const rows = 6;
+            const padding = 8;
+            const brickW = (w - (padding * (cols + 1))) / cols;
+            const brickH = 20;
+            const offsetTop = 80;
+
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    bricks.push({
+                        x: padding + c * (brickW + padding),
+                        y: offsetTop + r * (brickH + padding),
+                        w: brickW, h: brickH,
+                        status: 1,
+                        color: colors[r % colors.length]
+                    });
+                }
+            }
+        }
+
+        function resetBall() {
+            ball.x = w / 2;
+            ball.y = h / 2 + 100;
+            ball.dx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random()*2);
+            ball.dy = -4;
+            ball.speed = 5;
+            ball.tail = [];
+        }
+
+        function update() {
+            // 1. 移动球
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // 记录拖尾 (只存最近10帧)
+            ball.tail.push({x: ball.x, y: ball.y});
+            if(ball.tail.length > 10) ball.tail.shift();
+
+            // 墙壁碰撞
+            if(ball.x + ball.r > w || ball.x - ball.r < 0) {
+                ball.dx = -ball.dx;
+                // 撞墙也要一点点震动
+                // shake(); 
+            }
+            if(ball.y - ball.r < 0) ball.dy = -ball.dy;
+
+            // 掉落死亡
+            if(ball.y - ball.r > h) {
+                gameOver();
+                return;
+            }
+
+            // 挡板碰撞 (核心手感：根据击打位置改变X速度)
+            if(ball.y + ball.r > paddle.y && 
+               ball.y - ball.r < paddle.y + paddle.h &&
+               ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+                
+                ball.dy = -Math.abs(ball.dy); // 强制向上
+                ball.speed += 0.2; // 越打越快
+                
+                // 摩擦力角度修正
+                let hitPoint = ball.x - (paddle.x + paddle.w/2);
+                ball.dx = hitPoint * 0.2; 
+                
+                explode(ball.x, ball.y, '#fff'); // 撞击火花
+            }
+
+            // 砖块碰撞
+            let activeBricks = 0;
+            bricks.forEach(b => {
+                if(b.status === 1) {
+                    activeBricks++;
+                    if(ball.x > b.x && ball.x < b.x + b.w && 
+                       ball.y > b.y && ball.y < b.y + b.h) {
+                        ball.dy = -ball.dy;
+                        b.status = 0;
+                        score += 10;
+                        uiScore.innerText = score;
+                        
+                        shake(); // 震动！
+                        explode(b.x + b.w/2, b.y + b.h/2, b.color); // 爆炸！
+                    }
+                }
+            });
+
+            if(activeBricks === 0) {
+                initLevel(); // 无限关卡，打完重置
+                ball.speed += 1;
+                resetBall();
+            }
+        }
+
+        function draw() {
+            // 清屏 (留一点点残影，制造速度感)
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(0, 0, w, h);
+
+            // 1. 画拖尾
+            ball.tail.forEach((pos, i) => {
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, ball.r * (i/10), 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255,255,255,${i/15})`;
+                ctx.fill();
+            });
+
+            // 2. 画球 (发光)
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 15; ctx.shadowColor = '#fff';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 3. 画挡板
+            ctx.fillStyle = paddle.color;
+            ctx.shadowBlur = 20; ctx.shadowColor = paddle.color;
+            ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+            ctx.shadowBlur = 0;
+
+            // 4. 画砖块
+            bricks.forEach(b => {
+                if(b.status === 1) {
+                    ctx.fillStyle = b.color;
+                    ctx.fillRect(b.x, b.y, b.w-2, b.h-2); // 留缝隙
+                    // 高光
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.fillRect(b.x, b.y, b.w-2, b.h/2);
+                }
+            });
+
+            // 5. 画粒子
+            particles.forEach((p, i) => {
+                if(p.life > 0) {
+                    p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, Math.random()*3, 0, Math.PI*2);
+                    ctx.fill();
+                } else {
+                    particles.splice(i, 1);
+                }
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function loop() {
+            if(!isPlaying) return;
+            update();
+            draw();
+            animationId = requestAnimationFrame(loop);
+        }
+
+        function startGame() {
+            isPlaying = true;
+            score = 0;
+            uiScore.innerText = '0';
+            overlay.style.opacity = 0;
+            setTimeout(() => overlay.style.display = 'none', 300);
+            initLevel();
+            resetBall();
+            loop();
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.style.opacity = 1, 10);
+            title.innerHTML = "GAME<br>OVER";
+            btn.innerText = "TRY AGAIN";
+        }
+
+        // --- 操控 (跟随手指/鼠标) ---
+        function movePaddle(e) {
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let rect = c.getBoundingClientRect();
+            let relativeX = clientX - rect.left;
+            
+            // 限制挡板不出界
+            let newX = relativeX - paddle.w / 2;
+            if(newX < 0) newX = 0;
+            if(newX + paddle.w > w) newX = w - paddle.w;
+            
+            paddle.x = newX;
+        }
+
+        // 触摸事件
+        c.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // 再次确保不滚动
+            movePaddle(e);
+        }, { passive: false });
+
+        // 鼠标事件
+        document.addEventListener('mousemove', movePaddle);
+
+        // 按钮点击
+        btn.addEventListener('click', startGame);
+
+        // 初始渲染
+        initLevel();
+        draw();
+
+    </script>
+</body>
+</html>
